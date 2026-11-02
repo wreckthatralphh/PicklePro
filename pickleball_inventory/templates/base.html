@@ -1,0 +1,46 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <meta name="theme-color" content="#123524">
+  <meta name="description" content="Track pickleball paddle stock, pricing, and specs.">
+  <title>{% block title %}Paddle Inventory{% endblock %} · PicklePro</title>
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&display=swap" rel="stylesheet">
+  <link rel="stylesheet" href="{{ url_for('static', filename='style.css') }}">
+</head>
+<body>
+  <header class="topbar">
+    <div class="container topbar-inner">
+      <a href="{{ url_for('index') }}" class="logo" aria-label="PicklePro home">
+        <span class="logo-ball" aria-hidden="true"></span>
+        <span>Pickle<em>Pro</em></span>
+      </a>
+      <nav aria-label="Main">
+        <a href="{{ url_for('index') }}" class="nav-link">Inventory</a>
+        <a href="{{ url_for('sales') }}" class="nav-link">Sales</a>
+        <a href="{{ url_for('create_paddle') }}" class="btn btn-accent">+ Add paddle</a>
+      </nav>
+    </div>
+  </header>
+
+  <main class="container">
+    {% with messages = get_flashed_messages(with_categories=true) %}
+      {% if messages %}
+        <div class="flashes" role="status">
+          {% for category, message in messages %}
+            <p class="flash flash-{{ category }}">{{ message }}</p>
+          {% endfor %}
+        </div>
+      {% endif %}
+    {% endwith %}
+    {% block content %}{% endblock %}
+  </main>
+
+  <footer class="container footer">
+    <p>PicklePro · Pickleball Paddle Inventory · Built with Python &amp; Flask</p>
+  </footer>
+</body>
+</html>

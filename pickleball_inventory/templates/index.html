@@ -1,0 +1,147 @@
+{% extends "base.html" %}
+{% block content %}
+<section class="hero">
+  <div>
+    <p class="eyebrow">Pro shop</p>
+    <h1>Paddle inventory</h1>
+    <p class="muted">Track stock, specs, and value across every paddle on the wall.</p>
+  </div>
+</section>
+
+<section class="stats" aria-label="Inventory summary">
+  <div class="stat">
+    <span class="stat-label">Paddle models</span>
+    <span class="stat-value">{{ stats.models }}</span>
+  </div>
+  <div class="stat">
+    <span class="stat-label">Units in stock</span>
+    <span class="stat-value">{{ stats.units }}</span>
+  </div>
+  <div class="stat">
+    <span class="stat-label">Inventory value</span>
+    <span class="stat-value">{{ stats.value | money }}</span>
+  </div>
+  <div class="stat stat-warn">
+    <span class="stat-label">Low / out of stock</span>
+    <span class="stat-value">{{ stats.low }}</span>
+  </div>
+  <a class="stat stat-link" href="{{ url_for('sales') }}">
+    <span class="stat-label">Paddles sold</span>
+    <span class="stat-value">{{ sales_stats.units }}</span>
+  </a>
+  <a class="stat stat-link stat-accent" href="{{ url_for('sales') }}">
+    <span class="stat-label">Sales value</span>
+    <span class="stat-value">{{ sales_stats.revenue | money }}</span>
+  </a>
+</section>
+
+<form class="filters" method="get" action="{{ url_for('index') }}" role="search">
+  <div class="field grow">
+    <label for="q">Search</label>
+    <input id="q" name="q" type="search" placeholder="Brand, model, SKU, or color" value="{{ filters.q }}">
+  </div>
+  <div class="field">
+    <label for="brand">Brand</label>
+    <select id="brand" name="brand">
+      <option value="">All brands</option>
+      {% for b in brands %}
+        <option value="{{ b }}" {% if filters.brand == b %}selected{% endif %}>{{ b }}</option>
+      {% endfor %}
+    </select>
+  </div>
+  <div class="field">
+    <label for="stock">Stock</label>
+    <select id="stock" name="stock">
+      <option value="">Any</option>
+      <option value="in" {% if filters.stock == 'in' %}selected{% endif %}>In stock</option>
+      <option value="low" {% if filters.stock == 'low' %}selected{% endif %}>Low stock</option>
+      <option value="out" {% if filters.stock == 'out' %}selected{% endif %}>Out of stock</option>
+    </select>
+  </div>
+  <div class="field">
+    <label for="sort">Sort by</label>
+    <select id="sort" name="sort">
+      {% for value, label in [('brand','Brand'),('price_asc','Price: low to high'),('price_desc','Price: high to low'),('qty_asc','Quantity: low to high'),('qty_desc','Quantity: high to low'),('weight','Weight')] %}
+        <option value="{{ value }}" {% if filters.sort == value %}selected{% endif %}>{{ label }}</option>
+      {% endfor %}
+    </select>
+  </div>
+  <div class="filter-actions">
+    <button type="submit" class="btn btn-primary">Apply</button>
+    <a href="{{ url_for('index') }}" class="btn btn-ghost">Reset</a>
+  </div>
+</form>
+
+{% if paddles %}
+<div class="table-wrap">
+  <table>
+    <thead>
+      <tr>
+        <th scope="col">Paddle</th>
+        <th scope="col">Specs</th>
+        <th scope="col" class="num">Price</th>
+        <th scope="col">Stock</th>
+        <th scope="col"><span class="sr-only">Actions</span></th>
+      </tr>
+    </thead>
+    <tbody>
+      {% for p in paddles %}
+        {% if p.quantity == 0 %}{% set status, label = 'out', 'Out of stock' %}
+        {% elif p.quantity <= low_threshold %}{% set status, label = 'low', 'Low stock' %}
+        {% else %}{% set status, label = 'in', 'In stock' %}{% endif %}
+        <tr>
+          <td data-label="Paddle">
+            <div class="paddle-name">
+              <strong>{{ p.brand }}</strong>
+              <span>{{ p.model }}</span>
+              <code>{{ p.sku }}</code>
+            </div>
+          </td>
+          <td data-label="Specs">
+            <ul class="chips">
+              <li>{{ '%.1f' % p.weight_oz }} oz</li>
+              <li>{{ p.grip_size }} grip</li>
+              <li>{{ p.core_material }} core</li>
+              <li>{{ p.face_material }}</li>
+              <li>{{ p.color }}</li>
+            </ul>
+          </td>
+          <td data-label="Price" class="num">{{ p.price | money }}</td>
+          <td data-label="Stock">
+            <div class="stock">
+              <form method="post" action="{{ url_for('adjust_stock', paddle_id=p.id) }}">
+                <input type="hidden" name="delta" value="-1">
+                <button type="submit" class="qty-btn" aria-label="Remove one {{ p.model }}" {% if p.quantity == 0 %}disabled{% endif %}>−</button>
+              </form>
+              <span class="qty">{{ p.quantity }}</span>
+              <form method="post" action="{{ url_for('adjust_stock', paddle_id=p.id) }}">
+                <input type="hidden" name="delta" value="1">
+                <button type="submit" class="qty-btn" aria-label="Add one {{ p.model }}">+</button>
+              </form>
+              <span class="badge badge-{{ status }}">{{ label }}</span>
+            </div>
+          </td>
+          <td>
+            <div class="actions">
+              {% if p.quantity > 0 %}
+                <a href="{{ url_for('sales', paddle=p.id) }}#record" class="btn btn-accent btn-sm">Sell</a>
+              {% endif %}
+              <a href="{{ url_for('edit_paddle', paddle_id=p.id) }}" class="btn btn-ghost btn-sm">Edit</a>
+              <form method="post" action="{{ url_for('delete_paddle', paddle_id=p.id) }}" onsubmit="return confirm('Delete this paddle?');">
+                <button type="submit" class="btn btn-danger btn-sm">Delete</button>
+              </form>
+            </div>
+          </td>
+        </tr>
+      {% endfor %}
+    </tbody>
+  </table>
+</div>
+{% else %}
+<div class="empty">
+  <h2>No paddles found</h2>
+  <p class="muted">Try a different search or add a new paddle to the inventory.</p>
+  <a href="{{ url_for('create_paddle') }}" class="btn btn-primary">+ Add paddle</a>
+</div>
+{% endif %}
+{% endblock %}

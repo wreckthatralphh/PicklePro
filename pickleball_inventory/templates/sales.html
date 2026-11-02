@@ -1,0 +1,174 @@
+{% extends "base.html" %}
+{% block title %}Sales{% endblock %}
+{% block content %}
+<section class="hero">
+  <div>
+    <p class="eyebrow">Outgoing stock</p>
+    <h1>Paddle sales</h1>
+    <p class="muted">Record sold paddles. Stock is deducted automatically and totals update instantly.</p>
+  </div>
+</section>
+
+<section class="stats stats-4" aria-label="Sales summary">
+  <div class="stat">
+    <span class="stat-label">Paddles sold</span>
+    <span class="stat-value">{{ stats.units }}</span>
+  </div>
+  <div class="stat stat-accent">
+    <span class="stat-label">Total sales value</span>
+    <span class="stat-value">{{ stats.revenue | money }}</span>
+  </div>
+  <div class="stat">
+    <span class="stat-label">Transactions</span>
+    <span class="stat-value">{{ stats.transactions }}</span>
+  </div>
+  <div class="stat">
+    <span class="stat-label">Avg. sale value</span>
+    <span class="stat-value">{{ (stats.revenue / stats.transactions if stats.transactions else 0) | money }}</span>
+  </div>
+</section>
+
+<div class="sales-layout">
+  <section class="card" id="record" aria-labelledby="record-title">
+    <h2 id="record-title">Record a sale</h2>
+    {% if errors %}
+      <div class="flash flash-error" role="alert">
+        Please fix the following:
+        <ul>{% for e in errors %}<li>{{ e }}</li>{% endfor %}</ul>
+      </div>
+    {% endif %}
+    <form method="post" action="{{ url_for('sales') }}" class="sale-form">
+      <div class="field">
+        <label for="paddle_id">Paddle</label>
+        <select id="paddle_id" name="paddle_id" required>
+          <option value="">Select a paddle…</option>
+          {% for p in paddles %}
+            <option value="{{ p.id }}" data-price="{{ p.price }}" data-stock="{{ p.quantity }}"
+              {% if form.paddle_id|string == p.id|string %}selected{% endif %}
+              {% if p.quantity == 0 %}disabled{% endif %}>
+              {{ p.brand }} {{ p.model }} — {{ p.price | money }} ({{ p.quantity }} left)
+            </option>
+          {% endfor %}
+        </select>
+      </div>
+      <div class="field">
+        <label for="quantity">Quantity</label>
+        <input id="quantity" name="quantity" type="number" min="1" max="{{ max_qty }}" step="1" value="{{ form.quantity }}" required>
+        <p class="hint" id="stock-hint"></p>
+      </div>
+      <div class="field">
+        <label for="customer">Customer <span class="muted">(optional)</span></label>
+        <input id="customer" name="customer" type="text" maxlength="80" placeholder="e.g. Walk-in, Jane D." value="{{ form.customer }}">
+      </div>
+      <div class="sale-preview" aria-live="polite">
+        <span>Sale total</span>
+        <strong id="sale-total">₱0.00</strong>
+      </div>
+      <button type="submit" class="btn btn-primary">Record sale</button>
+    </form>
+  </section>
+
+  <section class="table-wrap" aria-labelledby="top-title">
+    <h2 class="section-title" id="top-title">Sold per paddle</h2>
+    {% if top_sellers %}
+    <table>
+      <thead>
+        <tr>
+          <th scope="col">Paddle</th>
+          <th scope="col" class="num">Orders</th>
+          <th scope="col" class="num">Units sold</th>
+          <th scope="col" class="num">Sales value</th>
+        </tr>
+      </thead>
+      <tbody>
+        {% for t in top_sellers %}
+        <tr>
+          <td data-label="Paddle">
+            <div style="display:flex;align-items:center;">
+              <span class="rank {% if loop.first %}rank-1{% endif %}">{{ loop.index }}</span>
+              <div class="paddle-name">
+                <strong>{{ t.brand }}</strong>
+                <span>{{ t.model }}</span>
+              </div>
+            </div>
+          </td>
+          <td data-label="Orders" class="num">{{ t.orders }}</td>
+          <td data-label="Units sold" class="num">{{ t.units }}</td>
+          <td data-label="Sales value" class="num">{{ t.revenue | money }}</td>
+        </tr>
+        {% endfor %}
+      </tbody>
+    </table>
+    {% else %}
+      <p class="empty-inline">No sales yet. Record your first sale to see totals per paddle.</p>
+    {% endif %}
+  </section>
+</div>
+
+<section class="table-wrap" aria-labelledby="recent-title">
+  <h2 class="section-title" id="recent-title">Sales history</h2>
+  {% if recent %}
+  <table>
+    <thead>
+      <tr>
+        <th scope="col">Date</th>
+        <th scope="col">Paddle</th>
+        <th scope="col">Customer</th>
+        <th scope="col" class="num">Qty</th>
+        <th scope="col" class="num">Unit price</th>
+        <th scope="col" class="num">Total</th>
+        <th scope="col"><span class="sr-only">Actions</span></th>
+      </tr>
+    </thead>
+    <tbody>
+      {% for s in recent %}
+      <tr>
+        <td data-label="Date">{{ s.sold_at[:16] }}</td>
+        <td data-label="Paddle">
+          <div class="paddle-name">
+            <strong>{{ s.brand }}</strong>
+            <span>{{ s.model }}</span>
+            <code>{{ s.sku }}</code>
+          </div>
+        </td>
+        <td data-label="Customer">{{ s.customer or '—' }}</td>
+        <td data-label="Qty" class="num">{{ s.quantity }}</td>
+        <td data-label="Unit price" class="num">{{ s.unit_price | money }}</td>
+        <td data-label="Total" class="num">{{ s.total | money }}</td>
+        <td>
+          <div class="actions">
+            <form method="post" action="{{ url_for('void_sale', sale_id=s.id) }}" onsubmit="return confirm('Void this sale and return the paddles to stock?');">
+              <button type="submit" class="btn btn-danger btn-sm">Void</button>
+            </form>
+          </div>
+        </td>
+      </tr>
+      {% endfor %}
+    </tbody>
+  </table>
+  {% else %}
+    <p class="empty-inline">Sales you record will appear here.</p>
+  {% endif %}
+</section>
+
+<script>
+  (function () {
+    const select = document.getElementById("paddle_id");
+    const qty = document.getElementById("quantity");
+    const total = document.getElementById("sale-total");
+    const hint = document.getElementById("stock-hint");
+    function update() {
+      const opt = select.selectedOptions[0];
+      const price = opt ? parseFloat(opt.dataset.price || "0") : 0;
+      const stock = opt && opt.dataset.stock ? parseInt(opt.dataset.stock, 10) : null;
+      const n = Math.max(0, parseInt(qty.value || "0", 10) || 0);
+      if (stock !== null) qty.max = Math.min(stock, {{ max_qty }});
+      hint.textContent = stock !== null ? stock + " in stock" : "";
+      total.textContent = fmt.format(price * n);
+    }
+    select.addEventListener("change", update);
+    qty.addEventListener("input", update);
+    update();
+  })();
+</script>
+{% endblock %}
